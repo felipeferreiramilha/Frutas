@@ -1,8 +1,11 @@
 import streamlit as st
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 st.set_page_config(page_title="Hutti Furts & Lázaro e Vladimir Frutamania", layout="centered")
 
-# Inicializar catálogo no session_state
+# Inicializar estados no session_state
 if "catalogo" not in st.session_state:
     st.session_state.catalogo = {
         "Frutas": {
@@ -32,13 +35,53 @@ if "carrinho" not in st.session_state:
 if "admin_logado" not in st.session_state:
     st.session_state.admin_logado = False
 
+if "cliente_logado" not in st.session_state:
+    st.session_state.cliente_logado = True  # Já inicia logado para facilitar
+    st.session_state.cliente_email = "felipeferreiramilha@gmail.com"
+    st.session_state.cliente_nome = "Felipe Ferreira"
+
+# Função para enviar e-mail de confirmação
+def enviar_email_compra(destinatario, carrinho, total):
+    # ATENÇÃO: Para enviar e-mails reais via Gmail, configure seu e-mail e sua "Senha de App" do Google abaixo.
+    # Caso deixe com os valores de exemplo, o sistema simulará o envio com sucesso sem travar o aplicativo.
+    remetente = "seu_email_aqui@gmail.com"
+    senha_app = "sua_senha_de_app_aqui"
+    
+    # Montar o resumo dos itens
+    resumo_itens = ""
+    for item in carrinho:
+        resumo_itens += f"- {item['produto']} | Qtd: {item['quantidade']} | Subtotal: R$ {item['subtotal']:.2f}\n"
+
+    # Se não configurou credenciais reais, simula o envio com sucesso
+    if remetente == "seu_email_aqui@gmail.com":
+        return True
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = remetente
+        msg['To'] = destinatario
+        msg['Subject'] = "🛒 Comprovante de Compra - Hutti Furts & Lázaro e Vladimir Frutamania"
+        
+        corpo = f"""Olá, {st.session_state.cliente_nome}!\n\nSua compra foi realizada com sucesso!\n\nItens do Pedido:\n{resumo_itens}\nVALOR TOTAL DA CONTA: R$ {total:.2f}\n\nObrigado por comprar no Hutti Furts e Lázaro e Vladimir Frutamania! Volte sempre!"""
+        msg.attach(MIMEText(corpo, 'plain'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(remetente, senha_app)
+        server.sendmail(remetente, destinatario, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail: {e}")
+        return False
+
 # Cabeçalho
 st.title("🍎 HUTTI FURTS")
 st.subheader("Lázaro e Vladimir Frutamania")
 st.markdown("---")
 
 # Menu de navegação lateral
-menu = st.sidebar.radio("Navegação", ["Loja / Comprar", "Carrinho", "Painel do Administrador"])
+menu = st.sidebar.radio("Navegação", ["Loja / Comprar", "Carrinho", "Área do Cliente / Login", "Painel do Administrador"])
 
 # ==================== LOJA ====================
 if menu == "Loja / Comprar":
@@ -99,6 +142,7 @@ elif menu == "Carrinho":
         
         st.markdown("---")
         st.markdown(f"### 💰 VALOR TOTAL DA CONTA: R$ {total_geral:.2f}")
+        st.write(f"📧 **E-mail de destino do comprovante:** `{st.session_state.cliente_email}`")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -107,8 +151,27 @@ elif menu == "Carrinho":
                 st.rerun()
         with col2:
             if st.button("Finalizar Compra", type="primary"):
-                st.success("Compra finalizada com sucesso! Obrigado por comprar no Hutti Furts!")
-                st.session_state.carrinho = []
+                sucesso = enviar_email_compra(st.session_state.cliente_email, st.session_state.carrinho, total_geral)
+                if sucesso:
+                    st.success(f"Compra finalizada com sucesso! Comprovante enviado para {st.session_state.cliente_email}.")
+                    st.session_state.carrinho = []
+                else:
+                    st.error("Compra finalizada, mas houve um erro ao enviar o e-mail.")
+
+# ==================== ÁREA DO CLIENTE ====================
+elif menu == "Área do Cliente / Login":
+    st.header("👤 Área do Cliente")
+    st.markdown("Gerencie seu cadastro e e-mail para recebimento de comprovantes de compras.")
+    
+    with st.form("form_cliente"):
+        nome_input = st.text_input("Seu Nome", value=st.session_state.cliente_nome)
+        email_input = st.text_input("Seu E-mail para Comprovantes", value=st.session_state.cliente_email)
+        
+        salvar = st.form_submit_button("Salvar Dados do Cliente")
+        if salvar:
+            st.session_state.cliente_nome = nome_input
+            st.session_state.cliente_email = email_input
+            st.success("Dados do cliente atualizados com sucesso!")
 
 # ==================== ADMINISTRAÇÃO ====================
 elif menu == "Painel do Administrador":

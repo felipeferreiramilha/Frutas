@@ -1,9 +1,21 @@
-# ==========================================
-# HUTTI FURTS & LAZARO E VLADIMIR FRUTAMANIA
-# Sistema de Gestão e Vendas
-# ==========================================
+meu_projeto/
+├── app.py
+└── templates/
+    ├── base.html
+    ├── loja.html
+    ├── carrinho.html
+    ├── login.html
+    └── admin.html
+    from flask import Flask, render_template, request, redirect, url_for, session, flash
 
-# Dicionário inicial de produtos e preços por kg ou unidade
+app = Flask(__name__)
+app.secret_key = "chave_secreta_hutti_furts_2026"
+
+# Credenciais do Administrador
+ADMIN_USER = "Felipe"
+ADMIN_PASS = "123456789"
+
+# Catálogo em memória
 catalogo = {
     "Frutas": {
         "Maçã": 6.50,
@@ -26,175 +38,131 @@ catalogo = {
     }
 }
 
-def exibir_cabecalho():
-    print("=" * 60)
-    print("      HUTTI FURTS & LAZARO E VLADIMIR FRUTAMANIA      ")
-    print("=" * 60)
+# Inicializa carrinho na sessão do usuário
+def obter_carrinho():
+    if "carrinho" not in session:
+        session["carrinho"] = []
+    return session["carrinho"]
 
-def menu_admin():
-    senha = input("Digite a senha do Administrador (Senha padrão: 1234): ")
-    if senha != "1234":
-        print("\n[Erro] Senha incorreta! Acesso negado.")
-        return
+# Rota principal - Loja
+@app.route("/")
+def loja():
+    carrinho = obter_carrinho()
+    total_itens = sum(item["quantidade"] for item in carrinho)
+    return render_template("loja.html", catalogo=catalogo, total_itens=total_itens)
 
-    while True:
-        print("\n--- PAINEL DO ADMINISTRADOR ---")
-        print("1. Visualizar Produtos e Preços")
-        print("2. Modificar Preço de um Produto")
-        print("3. Adicionar Novo Produto")
-        print("4. Voltar ao Menu Principal")
-        
-        opcao = input("Escolha uma opção: ")
-        
-        if opcao == "1":
-            print("\n--- CATÁLOGO ATUAL ---")
-            for categoria, itens in catalogo.items():
-                print(f"\n[{categoria}]")
-                for produto, preco in itens.items():
-                    print(f"  - {produto}: R$ {preco:.2f}")
-                    
-        elif opcao == "2":
-            print("\nCategorias disponíveis: Frutas, Carnes, Gelados")
-            cat = input("Digite a categoria do produto: ").capitalize()
-            if cat in catalogo:
-                print(f"\nProdutos em {cat}:")
-                for p in catalogo[cat]:
-                    print(f"  - {p}")
-                prod = input("Digite o nome exato do produto que deseja alterar: ")
-                if prod in catalogo[cat]:
-                    try:
-                        novo_preco = float(input(f"Digite o novo preço para {prod} (R$): "))
-                        catalogo[cat][prod] = novo_preco
-                        print(f"\n[Sucesso] O preço de {prod} foi atualizado para R$ {novo_preco:.2f}!")
-                    except ValueError:
-                        print("\n[Erro] Digite um valor numérico válido.")
-                else:
-                    print("\n[Erro] Produto não encontrado.")
-            else:
-                print("\n[Erro] Categoria inválida.")
-                
-        elif opcao == "3":
-            print("\nCategorias disponíveis: Frutas, Carnes, Gelados")
-            cat = input("Digite a categoria onde deseja adicionar: ").capitalize()
-            if cat in catalogo:
-                nome_novo = input("Digite o nome do novo produto: ")
-                try:
-                    preco_novo = float(input("Digite o preço do produto (R$): "))
-                    catalogo[cat][nome_novo] = preco_novo
-                    print(f"\n[Sucesso] Produto '{nome_novo}' adicionado com sucesso em {cat}!")
-                except ValueError:
-                    print("\n[Erro] Digite um valor numérico válido.")
-            else:
-                print("\n[Erro] Categoria inválida.")
-                
-        elif opcao == "4":
-            break
-        else:
-            print("\n[Erro] Opção inválida. Tente novamente.")
-
-def menu_consumidor():
-    carrinho = []
+# Adicionar item ao carrinho
+@app.route("/adicionar", methods=["POST"])
+def adicionar_carrinho():
+    categoria = request.form.get("categoria")
+    produto_nome = request.form.get("produto")
     
-    while True:
-        print("\n--- ÁREA DO CONSUMIDOR - FAÇA SUAS COMPRAS ---")
-        print("1. Ver Catálogo de Produtos")
-        print("2. Adicionar Produto ao Carrinho")
-        print("3. Ver Carrinho e Calcular Total")
-        print("4. Finalizar Compra")
-        print("5. Voltar ao Menu Principal")
-        
-        opcao = input("Escolha uma opção: ")
-        
-        if opcao == "1":
-            print("\n--- NOSSO CATÁLOGO ---")
-            for categoria, itens in catalogo.items():
-                print(f"\n[{categoria}]")
-                for produto, preco in itens.items():
-                    print(f"  - {produto}: R$ {preco:.2f}")
-                    
-        elif opcao == "2":
-            print("\nCategorias: Frutas | Carnes | Gelados")
-            cat = input("Escolha a categoria: ").capitalize()
-            if cat in catalogo:
-                print(f"\nItens em {cat}:")
-                lista_produtos = list(catalogo[cat].keys())
-                for i, prod in enumerate(lista_produtos, 1):
-                    print(f"  {i}. {prod} - R$ {catalogo[cat][prod]:.2f}")
-                
-                try:
-                    escolha_prod = int(input("Digite o número do produto desejado: ")) - 1
-                    if 0 <= escolha_prod < len(lista_produtos):
-                        nome_produto = lista_produtos[escolha_prod]
-                        preco_produto = catalogo[cat][nome_produto]
-                        
-                        quantidade = float(input(f"Informe a quantidade ou peso de '{nome_produto}': "))
-                        if quantidade > 0:
-                            subtotal = preco_produto * quantidade
-                            carrinho.append({
-                                "produto": nome_produto,
-                                "preco_unit": preco_produto,
-                                "quantidade": quantidade,
-                                "subtotal": subtotal
-                            })
-                            print(f"\n[Sucesso] {quantidade}x '{nome_produto}' adicionado ao carrinho!")
-                        else:
-                            print("\n[Erro] A quantidade deve ser maior que zero.")
-                    else:
-                        print("\n[Erro] Número de produto inválido.")
-                except ValueError:
-                    print("\n[Erro] Entrada inválida.")
-            else:
-                print("\n[Erro] Categoria inválida.")
-                
-        elif opcao == "3":
-            if not carrinho:
-                print("\nSeu carrinho está vazio.")
-            else:
-                print("\n--- SEU CARRINHO DE COMPRAS ---")
-                total_geral = 0
-                for item in carrinho:
-                    print(f"- {item['produto']} | Qtd: {item['quantidade']} | Preço Unit.: R$ {item['preco_unit']:.2f} | Subtotal: R$ {item['subtotal']:.2f}")
-                    total_geral += item['subtotal']
-                print("-" * 40)
-                print(f"VALOR TOTAL DA CONTA: R$ {total_geral:.2f}")
-                
-        elif opcao == "4":
-            if not carrinho:
-                print("\nSeu carrinho está vazio. Adicione itens antes de finalizar.")
-            else:
-                print("\n--- FECHAMENTO DE PEDIDO ---")
-                total_geral = sum(item['subtotal'] for item in carrinho)
-                for item in carrinho:
-                    print(f"- {item['produto']} ({item['quantidade']}) ............ R$ {item['subtotal']:.2f}")
-                print("=" * 40)
-                print(f"TOTAL A PAGAR: R$ {total_geral:.2f}")
-                print("\nObrigado por comprar no Hutti Furts e Lazaro e Vladimir Frutamania!")
-                print("Volte sempre!")
-                break
-                
-        elif opcao == "5":
-            break
-        else:
-            print("\n[Erro] Opção inválida.")
+    try:
+        quantidade = float(request.form.get("quantidade", 1))
+        if quantidade <= 0:
+            raise ValueError()
+    except ValueError:
+        flash("Informe uma quantidade válida superior a 0.", "danger")
+        return redirect(url_for("loja"))
 
-def main():
-    while True:
-        exibir_cabecalho()
-        print("1. Área do Consumidor (Comprar)")
-        print("2. Painel do Administrador (Gerenciar Preços)")
-        print("3. Sair do Sistema")
+    if categoria in catalogo and produto_nome in catalogo[categoria]:
+        preco_unit = catalogo[categoria][produto_nome]
+        subtotal = preco_unit * quantidade
+
+        carrinho = obter_carrinho()
         
-        escolha = input("\nQuem é você? Escolha uma opção: ")
+        # Se o item já estiver no carrinho, atualiza a quantidade
+        encontrado = False
+        for item in carrinho:
+            if item["produto"] == produto_nome:
+                item["quantidade"] += quantidade
+                item["subtotal"] = item["quantidade"] * item["preco_unit"]
+                encontrado = True
+                break
         
-        if escolha == "1":
-            menu_consumidor()
-        elif escolha == "2":
-            menu_admin()
-        elif escolha == "3":
-            print("\nSaindo do sistema. Até logo!")
-            break
+        if not encontrado:
+            carrinho.append({
+                "produto": produto_nome,
+                "preco_unit": preco_unit,
+                "quantidade": quantidade,
+                "subtotal": subtotal
+            })
+            
+        session.modified = True
+        flash(f"{quantidade}x {produto_nome} adicionado(s) ao carrinho!", "success")
+
+    return redirect(url_for("loja"))
+
+# Visualizar Carrinho
+@app.route("/carrinho")
+def ver_carrinho():
+    carrinho = obter_carrinho()
+    total = sum(item["subtotal"] for item in carrinho)
+    return render_template("carrinho.html", carrinho=carrinho, total=total)
+
+# Esvaziar Carrinho
+@app.route("/limpar", methods=["POST"])
+def limpar_carrinho():
+    session["carrinho"] = []
+    flash("Carrinho esvaziado com sucesso.", "info")
+    return redirect(url_for("ver_carrinho"))
+
+# Tela de Login do Administrador
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        usuario = request.form.get("usuario")
+        senha = request.form.get("senha")
+
+        if usuario == ADMIN_USER and senha == ADMIN_PASS:
+            session["admin_logado"] = True
+            flash("Login efetuado com sucesso!", "success")
+            return redirect(url_for("admin"))
         else:
-            print("\n[Erro] Opção inválida. Tente novamente.\n")
+            flash("Usuário ou senha incorretos!", "danger")
+
+    return render_template("login.html")
+
+# Logout do Admin
+@app.route("/logout")
+def logout():
+    session.pop("admin_logado", None)
+    flash("Sessão encerrada com sucesso.", "info")
+    return redirect(url_for("loja"))
+
+# Painel Administrativo
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if not session.get("admin_logado"):
+        flash("Acesso restrito. Faça login primeiro.", "warning")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        acao = request.form.get("acao")
+        
+        if acao == "alterar":
+            cat = request.form.get("categoria")
+            prod = request.form.get("produto")
+            try:
+                novo_preco = float(request.form.get("preco"))
+                if cat in catalogo and prod in catalogo[cat]:
+                    catalogo[cat][prod] = novo_preco
+                    flash(f"Preço de '{prod}' alterado para R$ {novo_preco:.2f}!", "success")
+            except ValueError:
+                flash("Preço inválido.", "danger")
+                
+        elif acao == "adicionar":
+            cat = request.form.get("categoria")
+            novo_prod = request.form.get("novo_produto")
+            try:
+                preco = float(request.form.get("novo_preco"))
+                if cat in catalogo and novo_prod:
+                    catalogo[cat][novo_prod] = preco
+                    flash(f"Produto '{novo_prod}' cadastrado em {cat}!", "success")
+            except ValueError:
+                flash("Valor numérico inválido para o preço.", "danger")
+
+    return render_template("admin.html", catalogo=catalogo)
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
